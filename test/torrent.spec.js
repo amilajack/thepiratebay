@@ -45,20 +45,26 @@ function assertHasArrayOfTorrents(arrayOfTorrents) {
 /**
  * todo: test the 'torrentLink' property, which is undefined in many queries
  */
-function assertHasNecessaryProperties(torrent) {
-  const propertiesToValidate = [
+function assertHasNecessaryProperties(torrent, additionalProperties = []) {
+  const defaultPropertiesToValidate = [
     'id', 'name', 'size', 'link', 'category', 'seeders', 'leechers',
     'uploadDate', 'magnetLink', 'subcategory', 'uploader', 'verified',
-    'uploaderLink'
+    'uploaderLink', ...additionalProperties
   ];
 
-  for (const property of propertiesToValidate) {
+  for (const property of defaultPropertiesToValidate) {
     expect(torrent).to.have.property(property);
     expect(torrent[property]).to.exist;
+    if (typeof torrent[property] === 'string') {
+      expect(torrent[property]).to.not.contain('undefined');
+    }
   }
 }
 
-describe('Torrent', () => {
+describe('Torrent', function torrentTest() {
+  // Temporarily allow retrying of tests until api outage solution is found
+  this.retries(3);
+
   describe('order object to number converter', () => {
     it('should convert orderBy and sortBy', (done) => {
       try {
@@ -94,7 +100,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('retrieves categories', async (done) => {
+    it('retrieves categories', async done => {
       try {
         expect(this.categories).to.be.an('array');
         done();
@@ -103,12 +109,13 @@ describe('Torrent', () => {
       }
     });
 
-    it('retrieves categories with expected properties', async (done) => {
+    it('retrieves categories with expected properties', async done => {
       try {
         const properties = ['name', 'id', 'subcategories'];
         for (const property of properties) {
           expect(this.categories[0]).to.have.property(property);
           expect(this.categories[0][property]).to.exist;
+          expect(this.categories[0][property]).to.not.contain('undefined');
         }
         done();
       } catch (err) {
@@ -120,8 +127,8 @@ describe('Torrent', () => {
   /**
    * @todo
    *
-   * it('searches by page number', async (done) => {});
-   * it('searches by category', async (done) => {});
+   * it('searches by page number', async done => {});
+   * it('searches by category', async done => {});
    */
   describe('search', function () {
     before(async () => {
@@ -132,7 +139,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('searches for items', async (done) => {
+    it('searches for items', async done => {
       try {
         assertHasArrayOfTorrents(this.search);
         done();
@@ -163,7 +170,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('should search un-verified', async (done) => {
+    it('should search un-verified', async done => {
       const searchResults = await Torrent.search('Game of Thrones', {
         category: '205',
         filter: {
@@ -173,8 +180,7 @@ describe('Torrent', () => {
 
       try {
         for (const result of searchResults) {
-          expect(result).to.have.property('verified');
-          expect(result.verified).to.be.oneOf([true, false]);
+          expect(result).to.have.property('verified').that.is.a('boolean');
         }
         done();
       } catch (err) {
@@ -182,7 +188,47 @@ describe('Torrent', () => {
       }
     });
 
-    it('should handle numerical values', async (done) => {
+    /**
+     * Assert by searching wrong
+     */
+    it('should search using primary category names', async function getCategoryNames(done) {
+      this.timeout(50000);
+
+      try {
+        const searchResults = await Promise.all([
+          Torrent.search('Game of Thrones', {
+            category: 'applications'
+          }),
+          Torrent.search('Game of Thrones', {
+            category: 'audio'
+          }),
+          Torrent.search('Game of Thrones', {
+            category: 'video'
+          }),
+          Torrent.search('Game of Thrones', {
+            category: 'games'
+          }),
+          Torrent.search('Game of Thrones', {
+            category: 'xxx'
+          }),
+          Torrent.search('Game of Thrones', {
+            category: 'other'
+          })
+        ]);
+
+        expect(searchResults[0][0].category.name).to.equal('Applications');
+        expect(searchResults[1][0].category.name).to.equal('Audio');
+        expect(searchResults[2][0].category.name).to.equal('Video');
+        expect(searchResults[3][0].category.name).to.equal('Games');
+        expect(searchResults[4][0].category.name).to.equal('Porn');
+        expect(searchResults[5][0].category.name).to.equal('Other');
+        done();
+      } catch (err) {
+        done(err);
+      }
+    });
+
+    it('should handle numerical values', async done => {
       try {
         const searchResults = await Torrent.search('Game of Thrones', {
           page: 1,
@@ -196,7 +242,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('should handle non-numerical values', async (done) => {
+    it('should handle non-numerical values', async done => {
       try {
         const searchResults = await Torrent.search('Game of Thrones', {
           category: 'all',
@@ -211,7 +257,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('should search with backwards compatible method', async (done) => {
+    it('should search with backwards compatible method', async done => {
       try {
         const searchResults = await Torrent.search('Game of Thrones', {
           orderby: '8' // Search orderby seeds, asc
@@ -226,7 +272,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('retrieves expected properties', async (done) => {
+    it('retrieves expected properties', async done => {
       try {
         assertHasNecessaryProperties(this.search[0]);
         done();
@@ -235,7 +281,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('searches by sortBy: desc', async (done) => {
+    it('searches by sortBy: desc', async done => {
       try {
         const searchResults = await Torrent.search('Game of Thrones', {
           category: '205',
@@ -252,7 +298,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('searches by sortBy: asc', async (done) => {
+    it('searches by sortBy: asc', async done => {
       try {
         const searchResults = await Torrent.search('Game of Thrones', {
           category: '205',
@@ -268,13 +314,33 @@ describe('Torrent', () => {
         done(err);
       }
     });
+
+    it('should get torrents, strict', async done => {
+      try {
+        const searchResults = await Promise.all([
+          Torrent.search('Game of Thrones S01E08'),
+          Torrent.search('Game of Thrones S02E03'),
+          Torrent.search('Game of Thrones S03E03')
+        ]);
+
+        for (const result of searchResults) {
+          expect(result).to.have.length.above(10);
+          expect(result[0])
+            .to.have.deep.property('seeders')
+            .that.is.greaterThan(50);
+        }
+        done();
+      } catch (err) {
+        done(err);
+      }
+    });
   });
 
   /**
    * Get torrent types
    */
   describe('torrent types', () => {
-    it('should get top torrents', async (done) => {
+    it('should get top torrents', async done => {
       try {
         const torrents = await Torrent.topTorrents();
         assertHasArrayOfTorrents(torrents);
@@ -286,7 +352,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('should get recent torrents', async (done) => {
+    it('should get recent torrents', async done => {
       try {
         const torrents = await Torrent.recentTorrents();
         assertHasArrayOfTorrents(torrents);
@@ -298,7 +364,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('should get users torrents', async (done) => {
+    it('should get users torrents', async done => {
       try {
         const torrents = await Torrent.userTorrents(testingUsername);
         assertHasArrayOfTorrents(torrents);
@@ -323,6 +389,21 @@ describe('Torrent', () => {
         this.torrent = await torrentFactory();
       } catch (err) {
         console.log(err);
+      }
+    });
+
+    it('should have no undefined properties', (done) => {
+      try {
+        for (const property in this.torrent) { // eslint-disable-line
+          if (this.torrent.hasOwnProperty(property)) {
+            if (typeof this.torrent[property] === 'string') {
+              expect(this.torrent[property]).to.not.include('undefined');
+            }
+          }
+        }
+        done();
+      } catch (err) {
+        done(err);
       }
     });
 
@@ -437,16 +518,6 @@ describe('Torrent', () => {
       try {
         expect(this.torrent).to.have.property('description');
         expect(this.torrent.description).to.be.a('string');
-        done();
-      } catch (err) {
-        done(err);
-      }
-    });
-
-    it('should have a picture', (done) => {
-      try {
-        expect(this.torrent).to.have.property('picture');
-        expect(this.torrent.picture).to.be.a('string');
         done();
       } catch (err) {
         done(err);
@@ -579,21 +650,6 @@ describe('Torrent', () => {
         }
       });
 
-      it('may have a torrent link', (done) => {
-        try {
-          expect(this.fistSearchResult).to.have.property('torrentLink');
-
-          if (this.fistSearchResult.torrentLink === '') {
-            expect(this.fistSearchResult.torrentLink)
-              .to
-              .match(/\/\/piratebaytorrents\.info\/\d+\/.+\.torrent/);
-          }
-          done();
-        } catch (err) {
-          done(err);
-        }
-      });
-
       it('should have a category', (done) => {
         try {
           expect(this.fistSearchResult).to.have.property('category');
@@ -646,7 +702,7 @@ describe('Torrent', () => {
       }
     });
 
-    it('should handle numeric input', async (done) => {
+    it('should handle numeric input', async done => {
       try {
         const topTorrents = await Torrent.topTorrents(205);
         expect(topTorrents).to.be.an('array');
@@ -917,20 +973,6 @@ describe('Torrent', () => {
         try {
           expect(this.userTorrents[0]).to.have.property('magnetLink');
           expect(this.userTorrents[0].magnetLink).to.match(/magnet:\?xt=.+/);
-          done();
-        } catch (err) {
-          done(err);
-        }
-      });
-
-      it('may have a torrent link', (done) => {
-        try {
-          expect(this.userTorrents[0]).to.have.property('torrentLink');
-          if (this.userTorrents[0].torrentLink === '') {
-            expect(this.userTorrents[0].torrentLink)
-              .to
-              .match(/\/\/piratebaytorrents\.info\/\d+\/.+\.torrent/);
-          }
           done();
         } catch (err) {
           done(err);

@@ -1,52 +1,56 @@
 The Pirate Bay node.js client
 =============================
 [![Build Status](https://travis-ci.org/t3chnoboy/thepiratebay.svg?branch=master)](https://travis-ci.org/t3chnoboy/thepiratebay)
+[![Build status](https://ci.appveyor.com/api/projects/status/l4s4n56skbaj6map/branch/master?svg=true)](https://ci.appveyor.com/project/amilajack/thepiratebay/branch/master)
 [![NPM version](https://badge.fury.io/js/thepiratebay.svg)](http://badge.fury.io/js/thepiratebay)
-[![Dependency Status](https://gemnasium.com/t3chnoboy/thepiratebay.svg)](https://gemnasium.com/t3chnoboy/thepiratebay)
+[![Dependency Status](https://img.shields.io/david/t3chnoboy/thepiratebay.svg)](https://david-dm.org/t3chnoboy/thepiratebay)
+[![npm](https://img.shields.io/npm/dm/thepiratebay.svg?maxAge=2592000)]()
 
 <p align="center">
-  <img src="https://i.imgur.com/xP3s8Xum.png"/>
+  <img src="https://upload.wikimedia.org/wikipedia/commons/1/16/The_Pirate_Bay_logo.svg" width="300px"/>
 </p>
 
 ## Installation
-[![NPM](https://nodei.co/npm/thepiratebay.png?downloads=true)](https://nodei.co/npm/thepiratebay/)
 
 Install using npm:
-```sh
-npm install thepiratebay
+```bash
+npm install thepiratebay --save
 ```
 
 ## Usage
 
 ```javascript
-  const PirateBay = require('thepiratebay');
+// ES6 module import
+import PirateBay from 'thepiratebay'
+/// CommonJS import
+const PirateBay = require('thepiratebay')
 ```
 All methods are asynchronous!
 You can use promises, ES6 generators, or async/await
 
 Using promises:
 ```javascript
-  PirateBay.search('Game of Thrones', {
-  	category: 205
-  })
-  .then(function(results){
-  	console.log(results);
-  })
-  .catch(function(err){
-  	console.log(err);
-  });
+PirateBay.search('Game of Thrones', {
+	category: 205
+})
+.then(function(results) {
+	console.log(results)
+})
+.catch(function(err) {
+	console.log(err)
+})
 ```
 
-Using ES7 async/await
+Using ES7 async/await (requires babel)
 ```javascript
 async search() {
-  const searchResults = await PirateBay.search({
-    category: 205,
+  const searchResults = await PirateBay.search('harry potter', {
+    category: 'video',
     page: 3,
     orderBy: 'seeds',
     sortBy: 'desc',
   })
-  console.log(searchResults);
+  console.log(searchResults)
 }
 ```
 
@@ -54,16 +58,20 @@ async search() {
 
 ### search
 ```javascript
-  // Takes a search query and options
-  PirateBay.search('Game of Thrones', {
-    category: 0,        // default - `/search/0/99/{category}`
-    filter: {
-      verified: true    // default - Filter all VIP or trusted torrents
-    },
-    page: 0,            // default - 0 - 99
-    orderBy: 'leeches', // default - name, date, size, seeds, leeches
-    sortBy: 'desc'      // default - desc, asc
-  })
+// Takes a search query and options
+PirateBay.search('Game of Thrones', {
+  category: 'all',    // default - 'all' | 'all', 'audio', 'video', 'xxx',
+                      //                   'applications', 'games', 'other'
+                      //
+                      // You can also use the category number:
+                      // `/search/0/99/{category_number}`
+  filter: {
+    verified: true    // default - true | Filter all VIP or trusted torrents
+  },
+  page: 0,            // default - 0 - 99
+  orderBy: 'leeches', // default - name, date, size, seeds, leeches
+  sortBy: 'desc'      // default - desc, asc
+})
 
 /* returns an array of search results:
 [
@@ -76,8 +84,7 @@ async search() {
     leechers: '552',
     uploadDate: 'Today 00:57',
     magnetLink: 'magnet:?xt=urn:btih:4e6a2304fed5841c04b16d61a0ba...
-    subcategory: { id: '202', name: 'Movies DVDR' },
-    torrentLink: '//piratebaytorrents.info/10013794/Game_of_Thron...
+    subcategory: { id: '202', name: 'Movies DVDR' }
   },
   ...
 ]
@@ -86,15 +93,15 @@ async search() {
 
 ### getTorrent
 ```javascript
-  // takes an id or a link
-  PirateBay
-    .getTorrent('10676856')
-    .then(function(results) {
-      console.log(results);
-    })
-    .catch(function(error) {
-      console.log(error);
-    });
+// takes an id or a link
+PirateBay
+  .getTorrent('10676856')
+  .then(function(results) {
+    console.log(results)
+  })
+  .catch(function(error) {
+    console.log(error)
+  })
 
 /*
 output:
@@ -105,48 +112,43 @@ output:
     seeders: '14142',
     leechers: '3140',
     uploadDate: '2014-08-02 08:15:25 GMT',
-    torrentLink: undefined,
     magnetLink: 'magnet:?xt=urn:btih:025....
     link: 'http://thepiratebay.se/torrent/10676856/',
     id: '10676856',
-    description: 'I've always known that Spider-Man...',
-    picture: 'http://image.bayimg.com/bdca01a243abf68...'
+    description: 'I've always known that Spider-Man...'
   }
 */
 ```
 
 ### topTorrents
-http://thepiratebay.se/top
 ```javascript
-  // returns top 100 torrents
-  PirateBay.topTorrents()
+// returns top 100 torrents
+PirateBay.topTorrents()
 
-  // returns top 100 torrents for the category '400' aka Games
-  PirateBay.topTorrents(400)
+// returns top 100 torrents for the category '400' aka Games
+PirateBay.topTorrents(400)
 ```
 
 ### recentTorrents
-http://thepiratebay.se/recent
 ```javascript
-  // returns the most recent torrents
-  PirateBay.recentTorrents()
+// returns the most recent torrents
+PirateBay.recentTorrents()
 ```
 
 ### userTorrents
-http://thepiratebay.se/user/YIFY/3/5/0
 ```javascript
-  // Gets a specific user's torrents
-  PirateBay.userTorrents('YIFY', {
-    page: 3,
-    orderBy: 'name',
-    sortBy: 'asc'
-  })
+// Gets a specific user's torrents
+PirateBay.userTorrents('YIFY', {
+  page: 3,
+  orderBy: 'name',
+  sortBy: 'asc'
+})
 ```
 
 ### getCategories
 ```javascript
-  // Gets all available categories on piratebay
-  PirateBay.getCategories();
+// Gets all available categories on piratebay
+PirateBay.getCategories()
 
 /*
 [

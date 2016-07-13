@@ -2,46 +2,11 @@
 
 /**
  * Parse all pages
- *
- * @todo: support callbacks with callbackify
  */
 import cheerio from 'cheerio';
-import zlib from 'zlib';
-import request from 'request';
+import fetch from 'isomorphic-fetch';
 import { baseUrl } from './Torrent';
 
-
-export function requestWithEncoding(options, callback) {
-  const req = request(options);
-
-  req.on('response', (res) => {
-    const chunks = [];
-
-    res.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
-
-    res.on('end', () => {
-      const buffer = Buffer.concat(chunks);
-      const encoding = res.headers['content-encoding'];
-      if (encoding === 'gzip') {
-        zlib.gunzip(buffer, (err, decoded) => {
-          callback(err, decoded && decoded.toString());
-        });
-      } else if (encoding === 'deflate') {
-        zlib.inflate(buffer, (err, decoded) => {
-          callback(err, decoded && decoded.toString());
-        });
-      } else {
-        callback(null, buffer.toString());
-      }
-    });
-  });
-
-  req.on('error', (err) => {
-    callback(err);
-  });
-}
 
 export function _parseTorrentIsVIP(element) {
   return (
@@ -59,24 +24,23 @@ export function isTorrentVerified(element) {
   return _parseTorrentIsVIP(element) || _parseTorrentIsTrusted(element);
 }
 
-export function parsePage(url, parse, filter = {}) {
-  return new Promise((resolve, reject) => {
-    let categories;
+export function parsePage(url, parseCallback, filter = {}) {
+  const attempt = (error) => {
+    if (error) console.log(error);
 
-    requestWithEncoding(url, (err, data) => {
-      if (err) {
-        reject(err);
-      } else {
-        try {
-          categories = parse(data, filter);
-        } catch (error) {
-          return reject(error);
-        }
+    return fetch(url, {
+      mode: 'no-cors'
+    })
+    .then(response => response.text());
+  };
 
-        return resolve(categories);
-      }
-    });
-  });
+  return attempt()
+    .then(response => (
+      response.includes('Database maintenance')
+        ? (attempt('Failed because of db error, retrying'))
+        : response
+    ))
+    .then(response => parseCallback(response, filter));
 }
 
 export function parseResults(resultsHTML, filter = {}) {
@@ -96,7 +60,6 @@ export function parseResults(resultsHTML, filter = {}) {
     const link = baseUrl + relativeLink;
     const id = parseInt(/^\/torrent\/(\d+)/.exec(relativeLink)[1], 10);
     const magnetLink = $(this).find('a[title="Download this torrent using magnet"]').attr('href');
-    const torrentLink = $(this).find('a[title="Download this torrent"]').attr('href');
     const uploader = $(this).find('font .detDesc').text();
     const uploaderLink = baseUrl + $(this).find('font a').attr('href');
     const verified = isTorrentVerified($(this));
@@ -113,7 +76,7 @@ export function parseResults(resultsHTML, filter = {}) {
 
     return {
       id, name, size, link, category, seeders, leechers, uploadDate, magnetLink,
-      subcategory, torrentLink, uploader, verified, uploaderLink
+      subcategory, uploader, verified, uploaderLink
     };
   });
 
@@ -161,13 +124,11 @@ export function parseTorrentPage(torrentPage) {
   const id = $('input[name=id]').attr('value');
   const link = `${baseUrl}/torrent/${id}`;
   const magnetLink = $('a[title="Get this torrent"]').attr('href');
-  const torrentLink = $('a[title="Torrent File"]').attr('href');
   const description = $('div.nfo').text().trim();
-  const picture = 'http:' + $('img[title="picture"]').attr('src'); // eslint-disable-line
 
   return {
-    name, size, seeders, leechers, uploadDate, torrentLink, magnetLink, link,
-    id, description, picture, uploader, uploaderLink
+    name, size, seeders, leechers, uploadDate, magnetLink, link,
+    id, description, uploader, uploaderLink
   };
 }
 

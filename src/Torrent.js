@@ -1,6 +1,3 @@
-/**
- * @todo: callbackify support
- */
 import {
   parsePage,
   parseResults,
@@ -9,11 +6,20 @@ import {
   parseTvShows,
   parseCategories
 } from './Parser';
-
+import querystring from 'querystring';
 
 export const baseUrl = 'https://thepiratebay.se';
 
 export const defaultOrder = { orderBy: 'seeds', sortBy: 'desc' };
+
+export const primaryCategoryNumbers = {
+  audio: 100,
+  video: 200,
+  applications: 300,
+  games: 400,
+  xxx: 500,
+  other: 600
+};
 
 /*
  * opts:
@@ -91,9 +97,25 @@ function castNumberToString(pageNumber) {
     typeof pageNumber !== 'string' ||
     typeof pageNumber !== 'number'
   ) {
-    console.log(pageNumber);
     throw new Error('Unexpected page number type');
   }
+}
+
+/**
+ * Determine the category number from an category name ('movies', 'audio', etc)
+ *
+ * @param  {number} || {string}
+ * @return {number}
+ */
+function resolveCategory(categoryParam) {
+  if (
+    typeof categoryParam === 'string' &&
+    categoryParam in primaryCategoryNumbers
+  ) {
+    return primaryCategoryNumbers[categoryParam];
+  }
+
+  return categoryParam;
 }
 
 export function search(title = '*', opts = {}) {
@@ -107,10 +129,12 @@ export function search(title = '*', opts = {}) {
     sortBy: 'desc'
   };
 
+  const convertedCategory = resolveCategory(opts.category);
+
   const castedOptions = {
     ...opts,
     page: opts.page ? castNumberToString(opts.page) : defaults.page,
-    category: opts.category ? castNumberToString(opts.category) : defaults.category,
+    category: opts.category ? castNumberToString(convertedCategory) : defaults.category,
     orderby: opts.orderby ? castNumberToString(opts.orderby) : defaults.orderby
   };
 
@@ -124,17 +148,14 @@ export function search(title = '*', opts = {}) {
 
   const orderingNumber = convertOrderByObject({ orderBy, sortBy });
 
-  const query = {
-    url: `${baseUrl}/s/`,
-    qs: {
-      q: title,
-      category,
-      page,
-      orderby: orderingNumber
-    }
-  };
+  const url = `${baseUrl}/s/?${querystring.stringify({
+    q: title,
+    category,
+    page,
+    orderby: orderingNumber
+  })}`;
 
-  return parsePage(query, parseResults, rest.filter);
+  return parsePage(url, parseResults, rest.filter);
 }
 
 export function getTorrent(id) {
@@ -142,7 +163,7 @@ export function getTorrent(id) {
     ? `${baseUrl}/torrent/${id}`
     : id.link || id;
 
-  return parsePage({ url }, parseTorrentPage);
+  return parsePage(url, parseTorrentPage);
 }
 
 export function topTorrents(category = 'all') {
@@ -172,13 +193,10 @@ export function userTorrents(username, opts = {}) {
     });
   }
 
-  const query = {
-    url: `${baseUrl}/user/${username}`,
-    qs: {
-      page: opts.page ? castNumberToString(opts.page) : '0',
-      orderby: orderby || '99'
-    }
-  };
+  const query = `${baseUrl}/user/${username}/?${querystring.stringify({
+    page: opts.page ? castNumberToString(opts.page) : '0',
+    orderby: orderby || '99'
+  })}`;
 
   return parsePage(query, parseResults);
 }
